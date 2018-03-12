@@ -144,7 +144,7 @@ func (c *Client) read() {
 			c.maybeError(err)
 			return
 		}
-		c.messageListener(c, msg)
+		go c.messageListener(c, msg)
 	}
 }
 
