@@ -32,27 +32,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := Client{
+	var c Client
+	c = Client{
 		conn:         conn,
 		pingInterval: defaultDuration(h.PingInterval, time.Second*25),
 		writeTimeout: defaultDuration(h.PingInterval, time.Second*25),
 		done:         make(chan struct{}),
 
-		messageListener: func(c *Client, msg []byte) {
+		messageListener: func(msg []byte) {
 			if h.MessageListener != nil {
-				h.MessageListener(c, msg)
+				h.MessageListener(&c, msg)
 			}
 		},
-		errorListener: func(c *Client, err error) {
+		errorListener: func(err error) {
 			if h.ErrorListener != nil {
-				h.ErrorListener(c, err)
+				h.ErrorListener(&c, err)
 			} else if h.Logger != nil {
 				h.Logger.Println(err)
 			}
 		},
-		closeListener: func(c *Client) {
+		closeListener: func() {
 			if h.CloseListener != nil {
-				h.CloseListener(c)
+				h.CloseListener(&c)
 			}
 		},
 	}
@@ -79,16 +80,16 @@ type Client struct {
 	writeTimeout time.Duration
 	done         chan struct{}
 
-	messageListener func(*Client, []byte)
-	errorListener   func(*Client, error)
-	closeListener   func(*Client)
+	messageListener func([]byte)
+	errorListener   func(error)
+	closeListener   func()
 }
 
 // Close attempts to inform the client before terminating the connection.
 // Subsequent calls to Close result in a no-op.
 func (c *Client) Close(closeCode ...int) {
 	c.once.Do(func() {
-		go c.closeListener(c)
+		go c.closeListener()
 		close(c.done)
 		closeCode = append(closeCode, websocket.CloseNoStatusReceived)
 		msg := websocket.FormatCloseMessage(closeCode[0], "")
@@ -119,7 +120,7 @@ func (c *Client) maybeError(err error) {
 	}
 	closeCode := websocket.CloseNoStatusReceived
 	if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-		go c.errorListener(c, fmt.Errorf("websocket was closed unexpectedly: %s", err))
+		go c.errorListener(fmt.Errorf("websocket was closed unexpectedly: %s", err))
 	}
 	go c.Close(closeCode)
 }
@@ -144,7 +145,7 @@ func (c *Client) read() {
 			c.maybeError(err)
 			return
 		}
-		go c.messageListener(c, msg)
+		go c.messageListener(msg)
 	}
 }
 
