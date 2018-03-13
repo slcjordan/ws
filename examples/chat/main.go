@@ -58,14 +58,14 @@ func main() {
 	}
 
 	http.Handle("/ws", &h)
-	var port = ":8344"
+	var port = ":8000"
 	http.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		index.Execute(w, map[string]string{
 			"hostname": "localhost",
 			"port":     port,
 		})
 	})
-	log.Printf("serving at %s\n", port)
+	logger.Printf("serving at %s\n", port)
 	http.ListenAndServe(port, nil)
 }
 
