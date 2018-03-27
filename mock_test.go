@@ -113,7 +113,7 @@ type MockConnection struct {
 func (m *MockConnection) Write(msg string) {
 	err := m.Conn.WriteMessage(websocket.TextMessage, []byte(msg))
 	if err != nil {
-		m.T.Fatalf("could not write message %#v: %s", msg)
+		m.T.Fatalf("could not write message %#v: %s", msg, err)
 	}
 }
 

@@ -16,6 +16,7 @@ type Handler struct {
 	Logger       *log.Logger
 	PingInterval time.Duration
 	WriteTimeout time.Duration
+	ReadTimeout  time.Duration
 
 	ConnectListener func(*Client)
 	MessageListener func(*Client, []byte)
@@ -33,10 +34,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var c Client
+	writeTimeout := defaultDuration(h.PingInterval, time.Second*25)
+	pingInterval := defaultDuration(h.PingInterval, time.Second*25)
 	c = Client{
 		conn:         conn,
-		pingInterval: defaultDuration(h.PingInterval, time.Second*25),
-		writeTimeout: defaultDuration(h.PingInterval, time.Second*25),
+		pingInterval: pingInterval,
+		writeTimeout: writeTimeout,
+		readTimeout:  defaultDuration(h.ReadTimeout, pingInterval+2*writeTimeout),
 		done:         make(chan struct{}),
 
 		messageListener: func(msg []byte) {
@@ -78,6 +82,7 @@ type Client struct {
 	conn         *websocket.Conn
 	pingInterval time.Duration
 	writeTimeout time.Duration
+	readTimeout  time.Duration
 	done         chan struct{}
 
 	messageListener func([]byte)
@@ -133,7 +138,7 @@ func (c *Client) start() {
 func (c *Client) read() {
 	defer c.Close()
 	resetPongDeadline := func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add((c.writeTimeout * 2) + c.pingInterval))
+		c.conn.SetReadDeadline(time.Now().Add(c.readTimeout))
 		return nil
 	}
 	c.conn.SetPongHandler(resetPongDeadline)
